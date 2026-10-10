@@ -80,7 +80,15 @@ check("浏览器B 的一键清空不影响A",
       (c.delete("/api/history?cid=" + B).status_code == 200)
       and len(c.get("/api/history?cid=" + A).get_json()) == 1)
 
-# 5. A 自己的删除操作正常
+# 5. 路径穿越与非法 task_id 防护
+check("路径穿越下载被拒(404)",
+      c.get("/api/download/..%2f..%2f..%2fetc%2fpasswd?cid=" + A).status_code == 404)
+check("路径穿越删除被拒(404)",
+      c.delete("/api/history/..%2f..%2fsecret?cid=" + A).status_code == 404)
+check("超长非法 task_id 被拒(404)",
+      c.get(f"/api/download/{'A'*300}?cid=" + A).status_code == 404)
+
+# 6. A 自己的删除操作正常
 check("浏览器A 删除单条记录成功",
       c.delete(f"/api/history/{tid}?cid=" + A).status_code == 200)
 check("删除后A历史为空", c.get("/api/history?cid=" + A).get_json() == [])

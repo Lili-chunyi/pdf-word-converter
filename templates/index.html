@@ -693,14 +693,15 @@ async function pollStatus(taskId) {
 
 function showResult(icon, msg, url, name, taskId) {
   resultBox.classList.add('show');
+  const safeMsg = esc(msg);
   if (url) {
-    resultInner.innerHTML = '<div class="ok-icon">' + icon + '</div><div class="ok-msg">' + msg + '</div>';
+    resultInner.innerHTML = '<div class="ok-icon">' + icon + '</div><div class="ok-msg">' + safeMsg + '</div>';
     downloadBtn.href = url;
     downloadBtn.setAttribute('download', name || '');
     downloadBtn.style.display = 'inline-block';
     if (taskId) loadPreview(taskId);
   } else {
-    resultInner.innerHTML = '<div class="ok-icon">' + icon + '</div><div class="err-msg">' + msg + '</div>';
+    resultInner.innerHTML = '<div class="ok-icon">' + icon + '</div><div class="err-msg">' + safeMsg + '</div>';
     downloadBtn.style.display = 'none';
     previewSection.classList.remove('show');
   }

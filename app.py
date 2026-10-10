@@ -17,7 +17,7 @@ from flask import Flask, jsonify, make_response, render_template, request, send_
 
 from converter import pdf2word, word2pdf
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STORAGE_DIR = os.path.join(BASE_DIR, "storage")
@@ -198,7 +198,17 @@ def _run_task(task_id, src_path, original_name, target, options, cid):
                 "size": os.path.getsize(final),
             })
     except Exception as e:
-        _update(task_id, status="error", message=str(e))
+        # 只向用户返回必要信息，抹掉内部路径，避免泄露服务器目录结构
+        msg = str(e)
+        for secret in (src_path, out_dir, STORAGE_DIR):
+            if secret:
+                msg = msg.replace(secret, "文件")
+        if isinstance(e, (pdf2word.ConversionError, word2pdf.ConversionError)):
+            _update(task_id, status="error", message=msg)
+        else:
+            print(f"[task {task_id}] 转换异常: {msg}")
+            _update(task_id, status="error",
+                    message="转换失败，请确认文件未损坏后重试；若反复失败请换一个文件试试")
 
 
 @app.get("/")
@@ -389,7 +399,9 @@ def api_preview(task_id):
                         word2pdf.convert_word_to_pdf(
                             os.path.join(out_dir, "output.docx"), out_dir)
                     except Exception as e:
-                        return jsonify({"error": f"预览生成失败：{e}"}), 500
+                        msg = str(e).replace(out_dir, "文件").replace(
+                            STORAGE_DIR, "storage")
+                        return jsonify({"error": f"预览生成失败：{msg}"}), 500
 
     return send_file(preview_path, mimetype="application/pdf",
                      as_attachment=False)
