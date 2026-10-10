@@ -407,6 +407,28 @@ function resetAll() {
 // ---------- 预览 ----------
 let previewUrl = null;
 
+// 客户端隔离：每个浏览器一个随机ID，云端历史/文件互不可见；本地(localhost)共用 local
+const IS_LOCAL = ['127.0.0.1', 'localhost'].includes(location.hostname);
+let CID = IS_LOCAL ? 'local' : localStorage.getItem('pdfword_cid');
+if (!CID) {
+  CID = (window.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'cid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  localStorage.setItem('pdfword_cid', CID);
+}
+const withCid = (u) => u + (u.includes('?') ? '&' : '?') + 'cid=' + encodeURIComponent(CID);
+
+// 客户端隔离：每个浏览器一个随机ID，云端历史/文件互不可见；本地(localhost)共用 local
+const IS_LOCAL = ['127.0.0.1', 'localhost'].includes(location.hostname);
+let CID = IS_LOCAL ? 'local' : localStorage.getItem('pdfword_cid');
+if (!CID) {
+  CID = (window.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'cid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  localStorage.setItem('pdfword_cid', CID);
+}
+const withCid = (u) => u + (u.includes('?') ? '&' : '?') + 'cid=' + encodeURIComponent(CID);
+
 async function loadPreview(taskId) {
   if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
   previewSection.classList.add('show');
@@ -416,7 +438,7 @@ async function loadPreview(taskId) {
   previewLoading.textContent = '正在生成预览…（Word 结果首次需转成预览 PDF，请稍候）';
   previewFrame.src = 'about:blank';
   try {
-    const resp = await fetch('/api/preview/' + taskId);
+    const resp = await fetch(withCid('/api/preview/' + taskId));
     if (!resp.ok) {
       const data = await resp.json().catch(() => ({}));
       throw new Error(data.error || '预览不可用');
@@ -487,7 +509,7 @@ historyMask.addEventListener('click', closeHistory);
 async function loadHistoryList() {
   historyList.innerHTML = '<div class="hist-empty">加载中…</div>';
   try {
-    const resp = await fetch('/api/history');
+    const resp = await fetch(withCid('/api/history'));
     const list = await resp.json();
     if (!resp.ok || !Array.isArray(list)) throw new Error('历史记录加载失败');
     historyFooter.style.display = list.length ? 'block' : 'none';
@@ -517,7 +539,7 @@ async function loadHistoryList() {
         + '<button class="hist-btn primary" data-pv="' + esc(r.task_id)
         + '" data-name="' + esc(r.download_name) + '"'
         + (r.available ? '' : ' disabled') + '>预览</button>'
-        + '<a class="hist-btn" href="/api/download/' + esc(r.task_id) + '"'
+        + '<a class="hist-btn" href="' + withCid('/api/download/' + esc(r.task_id)) + '"'
         + (r.available ? '' : ' style="pointer-events:none;opacity:.4"') + '>下载</a>'
         + '</div></div>';
     }).join('');
@@ -549,7 +571,7 @@ clearAllBtn.addEventListener('click', async () => {
   if (!n) return;
   if (!confirm('确认删除全部 ' + n + ' 条历史记录及对应文件吗？此操作不可恢复。')) return;
   try {
-    const resp = await fetch('/api/history', { method: 'DELETE' });
+    const resp = await fetch(withCid('/api/history'), { method: 'DELETE' });
     if (!resp.ok) throw new Error('删除失败，请重试');
     closePreviewModal();
     loadHistoryList();
@@ -566,7 +588,7 @@ async function openPreviewModal(taskId, name) {
   if (pvUrl) { URL.revokeObjectURL(pvUrl); pvUrl = null; }
   pvFrame.src = 'about:blank';
   try {
-    const resp = await fetch('/api/preview/' + taskId);
+    const resp = await fetch(withCid('/api/preview/' + taskId));
     if (!resp.ok) {
       const data = await resp.json().catch(() => ({}));
       throw new Error(data.error || '预览不可用');
@@ -644,7 +666,7 @@ convertBtn.addEventListener('click', async () => {
   }
 
   try {
-    const resp = await fetch('/api/convert', { method: 'POST', body: fd });
+    const resp = await fetch(withCid('/api/convert'), { method: 'POST', body: fd });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || '请求失败');
     polling = setInterval(() => pollStatus(data.task_id), 700);
@@ -658,7 +680,7 @@ convertBtn.addEventListener('click', async () => {
 
 async function pollStatus(taskId) {
   try {
-    const resp = await fetch('/api/status/' + taskId);
+    const resp = await fetch(withCid('/api/status/' + taskId));
     const st = await resp.json();
     if (st.error) throw new Error(st.error);
     progressBar.style.width = st.progress + '%';
