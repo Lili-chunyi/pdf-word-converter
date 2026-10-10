@@ -535,7 +535,7 @@ async function loadHistoryList() {
 async function deleteHistory(taskId) {
   if (!confirm('确认删除这条转换记录及其文件吗？删除后不可恢复。')) return;
   try {
-    const resp = await fetch('/api/history/' + taskId, { method: 'DELETE' });
+    const resp = await fetch(withCid('/api/history/' + taskId), { method: 'DELETE' });
     if (!resp.ok) throw new Error('删除失败，请重试');
     closePreviewModal();
     loadHistoryList();
@@ -667,7 +667,7 @@ async function pollStatus(taskId) {
     if (st.status === 'done') {
       clearInterval(polling);
       progressBox.classList.remove('show');
-      showResult('✅', st.message, '/api/download/' + taskId, st.download_name, taskId);
+      showResult('✅', st.message, withCid('/api/download/' + taskId), st.download_name, taskId);
     } else if (st.status === 'error') {
       clearInterval(polling);
       progressBox.classList.remove('show');
