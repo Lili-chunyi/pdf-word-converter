@@ -17,7 +17,7 @@ from flask import Flask, jsonify, make_response, render_template, request, send_
 
 from converter import pdf2word, word2pdf
 
-APP_VERSION = "1.3.7"
+APP_VERSION = "1.3.8"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STORAGE_DIR = os.path.join(BASE_DIR, "storage")
@@ -278,6 +278,17 @@ def api_status(task_id):
     with _lock:
         task = _tasks.get(task_id)
         if not task or not cid or task.get("owner") != cid:
+            # 内存未命中（多进程/重启后）：从磁盘历史兜底，避免误报"任务不存在"
+            if cid:
+                for rec in _load_history(cid):
+                    if rec.get("task_id") != task_id:
+                        continue
+                    if rec.get("status") == "done":
+                        return jsonify({"status": "done", "progress": 100,
+                                        "message": "转换完成",
+                                        "download_name": rec["download_name"]})
+                    return jsonify({"status": "error", "progress": 0,
+                                    "message": "服务器已重启，该任务丢失，请重新上传"})
             return jsonify({"error": "任务不存在"}), 404
         return jsonify({k: task[k] for k in
                         ("status", "progress", "message", "download_name")})
