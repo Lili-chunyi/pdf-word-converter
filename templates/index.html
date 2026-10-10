@@ -385,9 +385,9 @@
     <div class="wk-score-row"><span>得分：<b id="wkScore">0</b></span><span>时间：<b id="wkTime">30</b> s</span></div>
     <div class="wk-grid" id="wkGrid"></div>
     <div class="wk-actions">
-      <button id="wkStartBtn" class="wk-btn-main" disabled>探测服务器中…</button>
-      <button id="wkAgainBtn" class="wk-btn-2">再来一局</button>
-      <a id="wkSkip" href="javascript:void(0)">跳过游戏，直接使用 →</a>
+      <button id="wkStartBtn" class="wk-btn-main">▶ 开始游戏</button>
+      <button id="wkGoBtn" class="wk-btn-main" style="display:none">✓ 开始使用 →</button>
+      <a id="wkSkip" href="javascript:void(0)">跳过游戏，坐等30秒</a>
     </div>
   </div>
 </div>
@@ -814,7 +814,6 @@ async function pollStatus(taskId) {
   const timeEl = document.getElementById('wkTime');
   const statusEl = document.getElementById('wkStatus');
   const startBtn = document.getElementById('wkStartBtn');
-  const againBtn = document.getElementById('wkAgainBtn');
 
   setTimeout(() => modal.classList.add('show'), 400);
 
@@ -868,13 +867,14 @@ async function pollStatus(taskId) {
     clearInterval(popTimer); clearInterval(tickTimer);
     cells.forEach(c => c.innerHTML = '');
     timeEl.textContent = 30;
-    statusEl.textContent = '本局得分 ' + score + ' 分！' + (ready ? '' : ' 服务器还在唤醒，可以再来一局');
-    againBtn.style.display = 'inline-block';
+    statusEl.textContent = '本局得分 ' + score + ' 分！' + (ready ? ' 点「开始使用」继续' : ' 服务器还在唤醒，可以再来一局');
+    startBtn.style.display = '';
+    startBtn.textContent = '🔄 再来一局';
   }
   function startGame() {
     score = 0; timeLeft = 30; playing = true;
     scoreEl.textContent = 0; timeEl.textContent = 30;
-    againBtn.style.display = 'none';
+    startBtn.style.display = 'none';
     if (!ready) statusEl.textContent = '⏳ 服务器唤醒中，边玩边等…';
     popTimer = setInterval(pop, 650);
     tickTimer = setInterval(() => {
@@ -883,7 +883,7 @@ async function pollStatus(taskId) {
       if (timeLeft <= 0) endGame();
     }, 1000);
   }
-  againBtn.addEventListener('click', startGame);
+  startBtn.addEventListener('click', startGame);
 
   // 就绪探测：连续 2 次成功视为就绪
   const probe = async () => {
@@ -893,8 +893,7 @@ async function pollStatus(taskId) {
         ready = true;
         statusEl.classList.add('ok');
         statusEl.textContent = '✓ 服务器已就绪，随时可以开始转换！';
-        startBtn.disabled = false;
-        startBtn.textContent = '开始使用 →';
+        document.getElementById('wkGoBtn').style.display = '';
       }
     } catch (e) { readyOk = 0; }
   };
@@ -906,7 +905,7 @@ async function pollStatus(taskId) {
     clearInterval(readyTimer); clearInterval(popTimer); clearInterval(tickTimer);
     modal.classList.remove('show');
   }
-  startBtn.addEventListener('click', close);
+  document.getElementById('wkGoBtn').addEventListener('click', close);
   document.getElementById('wkSkip').addEventListener('click', close);
 })();
 
