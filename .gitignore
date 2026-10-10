@@ -1,0 +1,16 @@
+# 运行时数据与用户转换文件（含个人文档，严禁上传）
+storage/
+
+# 测试产物
+tests/out/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 系统文件
+Thumbs.db
+.DS_Store
