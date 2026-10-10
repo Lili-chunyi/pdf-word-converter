@@ -349,7 +349,6 @@
 
 <!-- 历史记录 -->
 <button id="historyBtn" title="查看近 30 天转换记录">历史记录</button>
-<button id="gameBtn" title="拍西瓜小游戏">🍉 拍西瓜</button>
 <div id="historyMask"></div>
 <aside id="historyDrawer">
   <div class="hist-head">
@@ -934,7 +933,6 @@ async function pollStatus(taskId) {
   }
   goBtn.addEventListener('click', close);
   skipEl.addEventListener('click', close);
-  document.getElementById('gameBtn').addEventListener('click', () => openGame(false));
 
   if (!IS_LOCAL && !localStorage.getItem('pdfword_wake_seen')) {
     setTimeout(() => openGame(true), 400);
