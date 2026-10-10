@@ -798,7 +798,7 @@ async function pollStatus(taskId) {
       showResult('❌', st.message, null, null);
     }
   } catch (err) {
-    if (err.retryable && ++pollFails <= 8) return;  // 轮询偶发闪断：静默等下个周期，最多容忍 8 次
+    if (err.retryable && ++pollFails <= 20) return;  // 轮询偶发闪断/唤醒中：静默等下个周期
     clearInterval(polling);
     progressBox.classList.remove('show');
     showResult('❌', err.message, null, null);
