@@ -223,6 +223,49 @@
   }
   #copyShareBtn:hover { border-color: #94a3b8; color: #334155; }
   #shareRow { font-size: 14.5px; color: #64748b; }
+  /* 唤醒小游戏 */
+  #wakeModal {
+    position: fixed; inset: 0; z-index: 130; display: none;
+    align-items: center; justify-content: center; background: rgba(15, 23, 42, .55);
+  }
+  #wakeModal.show { display: flex; }
+  .wk-box {
+    width: 340px; max-width: 92vw; background: #fff; border-radius: 16px;
+    padding: 20px 22px 18px; text-align: center;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, .3);
+  }
+  .wk-head { font-size: 20px; font-weight: 800; color: #1e293b; }
+  .wk-sub { font-size: 12.5px; color: #94a3b8; margin-top: 6px; line-height: 1.6; }
+  .wk-status { font-size: 13px; color: #64748b; margin: 10px 0 2px; min-height: 20px; font-weight: 600; }
+  .wk-status.ok { color: #16a34a; }
+  .wk-score-row {
+    display: flex; justify-content: space-between; font-size: 13px; color: #64748b;
+    margin: 8px 6px;
+  }
+  .wk-score-row b { color: #e11d48; font-size: 15px; }
+  .wk-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 14px;
+  }
+  .wk-cell {
+    aspect-ratio: 1; background: #f1f5f9; border-radius: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 34px;
+    overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+    transition: background .15s;
+  }
+  .wk-cell:active { background: #e2e8f0; }
+  .wk-mole { animation: wkpop .18s ease-out; }
+  @keyframes wkpop { from { transform: translateY(60%) scale(.6); } to { transform: none; } }
+  .wk-actions { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+  .wk-btn-main {
+    border: none; background: #e11d48; color: #fff; font-size: 15px; font-weight: 700;
+    padding: 10px 34px; border-radius: 999px; cursor: pointer;
+  }
+  .wk-btn-main:disabled { background: #cbd5e1; cursor: not-allowed; }
+  .wk-btn-2 {
+    display: none; border: 1px solid #e2e8f0; background: #fff; color: #475569;
+    font-size: 13px; padding: 6px 20px; border-radius: 999px; cursor: pointer;
+  }
+  #wkSkip { font-size: 12.5px; color: #94a3b8; text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -329,6 +372,22 @@
     <div class="pv-body">
       <iframe id="pvFrame" title="预览"></iframe>
       <div id="pvLoading">正在打开预览…</div>
+    </div>
+  </div>
+</div>
+
+<!-- 唤醒小游戏（仅在线版首次访客自动弹出） -->
+<div id="wakeModal">
+  <div class="wk-box">
+    <div class="wk-head">🍉 拍西瓜</div>
+    <div class="wk-sub">服务器正在唤醒（约 30–60 秒），先玩个游戏消磨时间！<br>点 🍉 得 1 分 · 🍯 得 3 分 · 💣 炸弹别点（扣 3 分）</div>
+    <div class="wk-status" id="wkStatus">⏳ 正在探测服务器…</div>
+    <div class="wk-score-row"><span>得分：<b id="wkScore">0</b></span><span>时间：<b id="wkTime">30</b> s</span></div>
+    <div class="wk-grid" id="wkGrid"></div>
+    <div class="wk-actions">
+      <button id="wkStartBtn" class="wk-btn-main" disabled>探测服务器中…</button>
+      <button id="wkAgainBtn" class="wk-btn-2">再来一局</button>
+      <a id="wkSkip" href="javascript:void(0)">跳过游戏，直接使用 →</a>
     </div>
   </div>
 </div>
@@ -745,6 +804,111 @@ async function pollStatus(taskId) {
     showResult('❌', err.message, null, null);
   }
 }
+
+// ---------- 唤醒小游戏：拍西瓜（仅在线版首次访客） ----------
+(function () {
+  if (IS_LOCAL || localStorage.getItem('pdfword_wake_seen')) return;
+  const modal = document.getElementById('wakeModal');
+  const grid = document.getElementById('wkGrid');
+  const scoreEl = document.getElementById('wkScore');
+  const timeEl = document.getElementById('wkTime');
+  const statusEl = document.getElementById('wkStatus');
+  const startBtn = document.getElementById('wkStartBtn');
+  const againBtn = document.getElementById('wkAgainBtn');
+
+  setTimeout(() => modal.classList.add('show'), 400);
+
+  const cells = [];
+  for (let i = 0; i < 9; i++) {
+    const c = document.createElement('div');
+    c.className = 'wk-cell';
+    grid.appendChild(c);
+    cells.push(c);
+  }
+
+  let score = 0, timeLeft = 30, playing = false, readyOk = 0, ready = false;
+  let popTimer = null, tickTimer = null;
+
+  const KINDS = [
+    { e: '🍉', pt: 1, w: 68 },
+    { e: '🍯', pt: 3, w: 14 },
+    { e: '💣', pt: -3, w: 18 },
+  ];
+  function pickKind() {
+    let r = Math.random() * 100;
+    for (const k of KINDS) { if (r < k.w) return k; r -= k.w; }
+    return KINDS[0];
+  }
+  function pop() {
+    const empty = cells.filter(c => !c.firstChild);
+    const n = empty.length ? (Math.random() < .3 ? 2 : 1) : 0;
+    for (let i = 0; i < n; i++) {
+      const c = empty[Math.floor(Math.random() * empty.length)];
+      if (!c || c.firstChild) continue;
+      const k = pickKind();
+      const m = document.createElement('span');
+      m.className = 'wk-mole';
+      m.textContent = k.e;
+      m.dataset.pt = k.pt;
+      c.appendChild(m);
+      setTimeout(() => { if (m.parentNode) m.remove(); }, 900 + Math.random() * 400);
+    }
+  }
+  grid.addEventListener('pointerdown', e => {
+    const m = e.target.closest('.wk-mole');
+    if (!m || !playing) return;
+    score += +m.dataset.pt;
+    if (score < 0) score = 0;
+    scoreEl.textContent = score;
+    m.style.transform = 'scale(1.25)';
+    setTimeout(() => m.remove(), 90);
+  });
+  function endGame() {
+    playing = false;
+    clearInterval(popTimer); clearInterval(tickTimer);
+    cells.forEach(c => c.innerHTML = '');
+    timeEl.textContent = 30;
+    statusEl.textContent = '本局得分 ' + score + ' 分！' + (ready ? '' : ' 服务器还在唤醒，可以再来一局');
+    againBtn.style.display = 'inline-block';
+  }
+  function startGame() {
+    score = 0; timeLeft = 30; playing = true;
+    scoreEl.textContent = 0; timeEl.textContent = 30;
+    againBtn.style.display = 'none';
+    if (!ready) statusEl.textContent = '⏳ 服务器唤醒中，边玩边等…';
+    popTimer = setInterval(pop, 650);
+    tickTimer = setInterval(() => {
+      timeLeft--;
+      timeEl.textContent = timeLeft;
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+  }
+  againBtn.addEventListener('click', startGame);
+
+  // 就绪探测：连续 2 次成功视为就绪
+  const probe = async () => {
+    try {
+      const r = await fetch('/api/version');
+      if (r.ok && ++readyOk >= 2 && !ready) {
+        ready = true;
+        statusEl.classList.add('ok');
+        statusEl.textContent = '✓ 服务器已就绪，随时可以开始转换！';
+        startBtn.disabled = false;
+        startBtn.textContent = '开始使用 →';
+      }
+    } catch (e) { readyOk = 0; }
+  };
+  const readyTimer = setInterval(probe, 2500);
+  probe();
+
+  function close() {
+    localStorage.setItem('pdfword_wake_seen', '1');
+    clearInterval(readyTimer); clearInterval(popTimer); clearInterval(tickTimer);
+    modal.classList.remove('show');
+  }
+  startBtn.addEventListener('click', close);
+  document.getElementById('wkSkip').addEventListener('click', close);
+})();
 
 function showResult(icon, msg, url, name, taskId) {
   resultBox.classList.add('show');
