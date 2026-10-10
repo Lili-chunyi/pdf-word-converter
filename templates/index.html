@@ -349,6 +349,7 @@
 
 <!-- 历史记录 -->
 <button id="historyBtn" title="查看近 30 天转换记录">历史记录</button>
+<button id="gameBtn" title="拍西瓜小游戏">🍉 拍西瓜</button>
 <div id="historyMask"></div>
 <aside id="historyDrawer">
   <div class="hist-head">
@@ -376,11 +377,11 @@
   </div>
 </div>
 
-<!-- 唤醒小游戏（仅在线版首次访客自动弹出） -->
+<!-- 唤醒小游戏（在线版首次访客自动弹出；左侧入口随时可玩） -->
 <div id="wakeModal">
   <div class="wk-box">
     <div class="wk-head">🍉 拍西瓜</div>
-    <div class="wk-sub">本工具作者用的是免费版服务器，首次转换需要等待20-30秒，来先玩个游戏吧<br>点 🍉 得 1 分 · 🍯 得 3 分 · 💣 炸弹别点（扣 3 分）</div>
+    <div class="wk-sub"><span id="wkSubWake">本工具作者用的是免费版服务器，首次转换需要等待20-30秒，来先玩个游戏吧<br></span>点 🍉 得 1 分 · 🍯 得 3 分 · 💣 炸弹别点（扣 3 分）</div>
     <div class="wk-status" id="wkStatus">⏳ 正在探测服务器…</div>
     <div class="wk-score-row"><span>得分：<b id="wkScore">0</b></span><span>时间：<b id="wkTime">30</b> s</span></div>
     <div class="wk-grid" id="wkGrid"></div>
@@ -805,17 +806,17 @@ async function pollStatus(taskId) {
   }
 }
 
-// ---------- 唤醒小游戏：拍西瓜（仅在线版首次访客） ----------
+// ---------- 拍西瓜小游戏：在线版首次访客自动弹出；左侧「🍉 拍西瓜」入口随时可玩 ----------
 (function () {
-  if (IS_LOCAL || localStorage.getItem('pdfword_wake_seen')) return;
   const modal = document.getElementById('wakeModal');
   const grid = document.getElementById('wkGrid');
   const scoreEl = document.getElementById('wkScore');
   const timeEl = document.getElementById('wkTime');
   const statusEl = document.getElementById('wkStatus');
+  const subWake = document.getElementById('wkSubWake');
+  const goBtn = document.getElementById('wkGoBtn');
   const startBtn = document.getElementById('wkStartBtn');
-
-  setTimeout(() => modal.classList.add('show'), 400);
+  const skipEl = document.getElementById('wkSkip');
 
   const cells = [];
   for (let i = 0; i < 9; i++) {
@@ -826,7 +827,7 @@ async function pollStatus(taskId) {
   }
 
   let score = 0, timeLeft = 30, playing = false, readyOk = 0, ready = false;
-  let popTimer = null, tickTimer = null;
+  let popTimer = null, tickTimer = null, readyTimer = null, manual = false;
 
   const KINDS = [
     { e: '🍉', pt: 1, w: 68 },
@@ -867,7 +868,9 @@ async function pollStatus(taskId) {
     clearInterval(popTimer); clearInterval(tickTimer);
     cells.forEach(c => c.innerHTML = '');
     timeEl.textContent = 30;
-    statusEl.textContent = '本局得分 ' + score + ' 分！' + (ready ? ' 点「开始使用」继续' : ' 服务器还在唤醒，可以再来一局');
+    statusEl.textContent = manual
+      ? '本局得分 ' + score + ' 分！'
+      : '本局得分 ' + score + ' 分！' + (ready ? ' 点「开始使用」继续' : ' 服务器还在唤醒，可以再来一局');
     startBtn.style.display = '';
     startBtn.textContent = '🔄 再来一局';
   }
@@ -875,7 +878,7 @@ async function pollStatus(taskId) {
     score = 0; timeLeft = 30; playing = true;
     scoreEl.textContent = 0; timeEl.textContent = 30;
     startBtn.style.display = 'none';
-    if (!ready) statusEl.textContent = '⏳ 服务器唤醒中，边玩边等…';
+    if (!manual && !ready) statusEl.textContent = '⏳ 服务器唤醒中，边玩边等…';
     popTimer = setInterval(pop, 650);
     tickTimer = setInterval(() => {
       timeLeft--;
@@ -885,7 +888,7 @@ async function pollStatus(taskId) {
   }
   startBtn.addEventListener('click', startGame);
 
-  // 就绪探测：连续 2 次成功视为就绪
+  // 就绪探测（仅首次唤醒自动弹出时）：连续 2 次成功视为就绪
   const probe = async () => {
     try {
       const r = await fetch('/api/version');
@@ -893,20 +896,49 @@ async function pollStatus(taskId) {
         ready = true;
         statusEl.classList.add('ok');
         statusEl.textContent = '✓ 服务器已就绪，随时可以开始转换！';
-        document.getElementById('wkGoBtn').style.display = '';
+        goBtn.style.display = '';
       }
     } catch (e) { readyOk = 0; }
   };
-  const readyTimer = setInterval(probe, 2500);
-  probe();
+
+  function openGame(auto) {
+    manual = !auto;
+    clearInterval(readyTimer); clearInterval(popTimer); clearInterval(tickTimer);
+    playing = false;
+    score = 0; timeLeft = 30; readyOk = 0;
+    scoreEl.textContent = 0; timeEl.textContent = 30;
+    cells.forEach(c => c.innerHTML = '');
+    startBtn.style.display = ''; startBtn.textContent = '▶ 开始游戏';
+    subWake.style.display = auto ? '' : 'none';
+    statusEl.classList.remove('ok');
+    if (auto) {
+      ready = false;
+      statusEl.textContent = '⏳ 正在探测服务器…';
+      goBtn.style.display = 'none';
+      skipEl.textContent = '跳过游戏，坐等30秒';
+      readyTimer = setInterval(probe, 2500);
+      probe();
+    } else {
+      ready = true;  // 手动入口：页面已能打开，无需探测
+      goBtn.style.display = 'none';
+      skipEl.textContent = '关闭';
+      statusEl.textContent = '准备好了就点「开始游戏」';
+    }
+    modal.classList.add('show');
+  }
 
   function close() {
-    localStorage.setItem('pdfword_wake_seen', '1');
+    if (!manual) localStorage.setItem('pdfword_wake_seen', '1');
     clearInterval(readyTimer); clearInterval(popTimer); clearInterval(tickTimer);
     modal.classList.remove('show');
   }
-  document.getElementById('wkGoBtn').addEventListener('click', close);
-  document.getElementById('wkSkip').addEventListener('click', close);
+  goBtn.addEventListener('click', close);
+  skipEl.addEventListener('click', close);
+  document.getElementById('gameBtn').addEventListener('click', () => openGame(false));
+
+  if (!IS_LOCAL && !localStorage.getItem('pdfword_wake_seen')) {
+    setTimeout(() => openGame(true), 400);
+  }
 })();
 
 function showResult(icon, msg, url, name, taskId) {
