@@ -624,6 +624,24 @@ previewModal.addEventListener('click', e => {
   if (e.target === previewModal) closePreviewModal();
 });
 
+// ---------- 安全 JSON 解析：服务器空响应/网关错误时给出可读提示 ----------
+async function safeJson(resp) {
+  const text = await resp.text();
+  if (!text) {
+    const e = new Error('服务器暂时没有响应，可能正在唤醒，请稍候重试');
+    e.retryable = true;
+    throw e;
+  }
+  try { return JSON.parse(text); }
+  catch (e) {
+    const err = new Error(resp.status >= 500
+      ? '服务器暂时不可用（HTTP ' + resp.status + '）'
+      : '服务器响应异常，请重试');
+    err.retryable = resp.status >= 500;
+    throw err;
+  }
+}
+
 // ---------- 页面自动更新（服务端版本变化时自动刷新，避免停留在旧页面） ----------
 const SERVER_VERSION = "{{ version }}";
 let versionChecking = false;
@@ -672,23 +690,41 @@ convertBtn.addEventListener('click', async () => {
     fd.append('dpi', dpiSel.value);
   }
 
-  try {
-    const resp = await fetch(withCid('/api/convert'), { method: 'POST', body: fd });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || '请求失败');
-    polling = setInterval(() => pollStatus(data.task_id), 700);
-  } catch (err) {
+  // 免费服务器冷启动可能返回空响应：自动重试，最多 3 次
+  let data = null, lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const resp = await fetch(withCid('/api/convert'), { method: 'POST', body: fd });
+      data = await safeJson(resp);
+      if (!resp.ok) throw new Error(data.error || ('请求失败（HTTP ' + resp.status + '）'));
+      lastErr = null;
+      break;
+    } catch (err) {
+      if (err instanceof TypeError) { err.message = '网络连接失败'; err.retryable = true; }
+      lastErr = err;
+      if (!err.retryable) break;  // 服务器明确拒绝（如文件类型不支持），不重试
+      if (attempt < 2) {
+        progressMsg.textContent = '服务器正在唤醒，请稍候…（自动重试 ' + (attempt + 1) + '/2）';
+        await new Promise(r => setTimeout(r, 2500));
+      }
+    }
+  }
+  if (lastErr) {
     progressBox.classList.remove('show');
     resultBox.classList.add('show');
-    resultInner.innerHTML = '<div class="err-msg">❌ ' + err.message + '</div>';
+    resultInner.innerHTML = '<div class="err-msg">❌ ' + esc(lastErr.message) + '</div>';
     againBtn.style.display = 'inline-block';
+  } else {
+    polling = setInterval(() => pollStatus(data.task_id), 700);
   }
 });
 
+let pollFails = 0;
 async function pollStatus(taskId) {
   try {
     const resp = await fetch(withCid('/api/status/' + taskId));
-    const st = await resp.json();
+    const st = await safeJson(resp);
+    pollFails = 0;
     if (st.error) throw new Error(st.error);
     progressBar.style.width = st.progress + '%';
     progressPct.textContent = st.progress + '%';
@@ -703,6 +739,7 @@ async function pollStatus(taskId) {
       showResult('❌', st.message, null, null);
     }
   } catch (err) {
+    if (err.retryable && ++pollFails <= 8) return;  // 轮询偶发闪断：静默等下个周期，最多容忍 8 次
     clearInterval(polling);
     progressBox.classList.remove('show');
     showResult('❌', err.message, null, null);
