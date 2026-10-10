@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: pdf-word-converter
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/version
+    autoDeploy: true

@@ -16,7 +16,7 @@ from flask import Flask, jsonify, make_response, render_template, request, send_
 
 from converter import pdf2word, word2pdf
 
-APP_VERSION = "1.2.4"
+APP_VERSION = "1.2.5"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STORAGE_DIR = os.path.join(BASE_DIR, "storage")
@@ -329,12 +329,15 @@ def too_large(e):
 
 if __name__ == "__main__":
     _cleanup_storage()
-    url = "http://127.0.0.1:8765/"
-    print("=" * 52)
-    print("  PDF ⇄ Word 双向转换工具已启动（纯本地处理）")
-    print(f"  请在浏览器访问：{url}")
-    print("  关闭本窗口即退出工具")
-    print("=" * 52)
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "8765"))
+    url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}/"
+    if port == 8765:
+        print("=" * 52)
+        print("  PDF ⇄ Word 双向转换工具已启动（纯本地处理）")
+        print(f"  请在浏览器访问：{url}")
+        print("  关闭本窗口即退出工具")
+        print("=" * 52)
     if not os.environ.get("PDFWORD_NO_BROWSER"):
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
-    app.run(host="127.0.0.1", port=8765, threaded=True, debug=False)
+    app.run(host=host, port=port, threaded=True, debug=False)

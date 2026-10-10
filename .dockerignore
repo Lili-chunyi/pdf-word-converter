@@ -1,0 +1,10 @@
+.git
+.gitignore
+storage/
+tests/
+README.md
+Dockerfile
+.dockerignore
+render.yaml
+启动工具.bat
+*.md
