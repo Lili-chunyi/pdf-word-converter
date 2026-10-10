@@ -17,7 +17,7 @@ from flask import Flask, jsonify, make_response, render_template, request, send_
 
 from converter import pdf2word, word2pdf
 
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STORAGE_DIR = os.path.join(BASE_DIR, "storage")

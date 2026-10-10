@@ -217,6 +217,11 @@
   }
   .tips { text-align: center; color: #94a3b8; font-size: 12.5px; line-height: 1.8; }
   .tips b { color: #64748b; }
+  #copyShareBtn {
+    background: none; border: 1px solid #cbd5e1; color: #64748b; border-radius: 10px;
+    padding: 1px 10px; font-size: 12px; cursor: pointer; vertical-align: middle;
+  }
+  #copyShareBtn:hover { border-color: #94a3b8; color: #334155; }
 </style>
 </head>
 <body>
@@ -293,7 +298,8 @@
 
   <p class="tips">
     <b>PDF → Word</b>：文本型 PDF 转为可编辑文档（保留字体/表格/图片/超链接）；扫描件按原顺序、原方向、原比例逐页嵌入高清图片<br>
-    <b>Word → PDF</b>：稳定转换，保持原排版 · 所有转换均在本地完成 · 近 30 天转换记录可在右侧「历史记录」查看
+    <b>Word → PDF</b>：稳定转换，保持原排版 · 所有转换均在本地完成 · 近 30 天转换记录可在右侧「历史记录」查看<br>
+    <span id="shareRow" style="display:none">想分享工具给朋友？<button id="copyShareBtn" type="button">复制工具链接</button> — 复制的只是工具地址，不含你的任何转换记录</span>
   </p>
 </div>
 
@@ -417,6 +423,17 @@ if (!CID) {
   localStorage.setItem('pdfword_cid', CID);
 }
 const withCid = (u) => u + (u.includes('?') ? '&' : '?') + 'cid=' + encodeURIComponent(CID);
+
+// 在线版显示"复制工具链接"：分享的永远是安全的主页地址（不含任何 cid）
+if (!IS_LOCAL) {
+  document.getElementById('shareRow').style.display = '';
+  document.getElementById('copyShareBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('copyShareBtn');
+    try { await navigator.clipboard.writeText(location.origin + '/'); } catch (e) {}
+    btn.textContent = '✓ 已复制';
+    setTimeout(() => { btn.textContent = '复制工具链接'; }, 2000);
+  });
+}
 
 async function loadPreview(taskId) {
   if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
