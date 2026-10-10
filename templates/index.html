@@ -418,17 +418,6 @@ if (!CID) {
 }
 const withCid = (u) => u + (u.includes('?') ? '&' : '?') + 'cid=' + encodeURIComponent(CID);
 
-// 客户端隔离：每个浏览器一个随机ID，云端历史/文件互不可见；本地(localhost)共用 local
-const IS_LOCAL = ['127.0.0.1', 'localhost'].includes(location.hostname);
-let CID = IS_LOCAL ? 'local' : localStorage.getItem('pdfword_cid');
-if (!CID) {
-  CID = (window.crypto && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : 'cid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
-  localStorage.setItem('pdfword_cid', CID);
-}
-const withCid = (u) => u + (u.includes('?') ? '&' : '?') + 'cid=' + encodeURIComponent(CID);
-
 async function loadPreview(taskId) {
   if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
   previewSection.classList.add('show');
